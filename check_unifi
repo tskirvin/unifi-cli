@@ -103,10 +103,11 @@ def main():
         else:
             offline[name] = 1
 
-    my_str = "%s offline=%d;online=%d;total=%d %d/%d devices online" % (
+    my_str = "%s offline=%d;%d;%d|total=%d %d/%d devices online" % (
         me,
         len(offline),
-        len(online),
+        opt.warn,
+        opt.crit,
         len(online) + len(offline),
         len(online),
         len(online) + len(offline),
@@ -136,6 +137,52 @@ if __name__ == '__main__':
 """
 
 =head1 NAME
+
+check_unifi - check_mk interface to check unifi network devices
+
+=head1 SYNOPSIS
+
+B<check_unifi>
+
+B<check_unifi> --crit 2 --warn 1
+
+=head1 USAGE
+
+check_unifi is a simple check_mk monitoring script that checks on the
+status of all ubiquiti devices on the network.
+
+=head1 OPTIONS
+
+=over 4
+
+=item --crit CRIT
+
+How many devices must be down before the alert is critical?  Default: 2
+
+=item --warn WARN
+
+How many devices must be down before the alert is warn?  Default: 1
+
+=item --config CONFIG_FILE
+
+Where should we load our unifi login configuration?  Defaults to
+F</etc/unifi/api.json>.
+
+=item --help
+
+Print some help documentation.
+
+=back
+
+=item
+
+=head1 AUTHOR
+
+Tim Skirvin <tskirvin@killfile.org>
+
+=head1 COPYRIGHT + LICENSE
+
+MIT License; see attached LICENSE file
 
 =cut
 

@@ -16,7 +16,7 @@ import json, optparse, unificontrol, ssl, sys
 # painless
 # sys.tracebacklimit = -1
 
-description = 'unifi CLI'
+description = 'block/unblock by mac address on a unifi network'
 usage = '%prog --action ACTION MAC'
 
 #########################################################################
@@ -83,14 +83,30 @@ def main():
     config = parseConfig(opt.config)
     client = connect_unifi(config)
 
-    if opt.action == 'status':
-        mac = args[0]
+    if len(args) != 1:
+        p.print_help()
+        sys.exit(-1)
 
-        results = client.list_clients(client_mac=mac)
-        print(json.dumps(results, indent=4))
+    mac = args[0]
+
+    if opt.action == 'status':
+        try:
+            results = client.list_clients(client_mac=mac)
+        except unificontrol.UnifiTransportError as e:
+            print('no matches' % e)
+            sys.exit(-1)
+        except Exception as e:
+            print('unknown error: %s' % e)
+            sys.exit(-1)
+
+        # print(json.dumps(results, indent=4))
+        ip = results[0]['ip']
+        hostname = results[0]['hostname']
+        mac = results[0]['mac']
+        blocked = 'blocked' if results[0]['blocked'] else 'not blocked'
+        print("%-15s   %-17s  %s (%s)" % (ip, mac, hostname, blocked))
 
     elif opt.action == 'block':
-        mac = args[0]
 
         try:
             client.block_client(mac)
@@ -98,11 +114,7 @@ def main():
         except Exception as e:
             raise Exception("tried to unblock %s and failed: %s" % (mac, e))
 
-        # results = client.list_clients(client_mac=mac)
-        # print(json.dumps(results, indent=4))
-
     elif opt.action == 'unblock':
-        mac = args[0]
 
         try:
             client.unblock_client(mac)
@@ -110,16 +122,11 @@ def main():
         except Exception as e:
             raise Exception("tried to unblock %s and failed: %s" % (mac, e))
 
-        # results = client.list_clients(client_mac=mac)
-        # print(json.dumps(results, indent=4))
-
     else:
         print("unknown action: %s" % opt.action)
         sys.exit(-1)
 
     sys.exit(0)
-    # results = client.list_clients()
-    # print(json.dumps(results, indent=4))
 
 if __name__ == '__main__':
     main()
@@ -131,6 +138,54 @@ if __name__ == '__main__':
 """
 
 =head1 NAME
+
+unifi-mac - block or unblock hosts by MAC address on a unifi network
+
+=head1 SYNOPSIS
+
+B<unifi-mac> --action block 12:34:56:78:90:ab
+
+B<unifi-mac> --action unblock 12:34:56:78:90:ab
+
+B<unifi-mac> 12:34:56:78:90:ab
+
+=head1 USAGE
+
+unifi-mac uses the Ubiquiti API to block, unblock, or check the block
+status of a specific MAC address on a Ubiquiti network.
+
+=head1 OPTIONS
+
+=over 4
+
+=item --action ACTION
+
+Valid choices: I<block>, I<unblock>, or I<status> (default).
+
+=item --config CONFIG_FILE
+
+Where should we load our unifi login configuration?  Defaults to
+F</etc/unifi/api.json>.
+
+=item --help
+
+Print some help documentation.
+
+=item MAC
+
+MAC address to scan.
+
+=back
+
+=item
+
+=head1 AUTHOR
+
+Tim Skirvin <tskirvin@killfile.org>
+
+=head1 COPYRIGHT + LICENSE
+
+MIT License; see attached LICENSE file
 
 =cut
 
