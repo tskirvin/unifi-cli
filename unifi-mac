@@ -1,0 +1,137 @@
+#!/usr/bin/python3
+
+#########################################################################
+### Configuration #######################################################
+#########################################################################
+
+config_file = '/etc/unifi/api.json'
+
+#########################################################################
+### Declarations ########################################################
+#########################################################################
+
+import json, optparse, unificontrol, ssl, sys
+
+# trying to make errors as painless as possible, but that's not *that*
+# painless
+# sys.tracebacklimit = -1
+
+description = 'unifi CLI'
+usage = '%prog --action ACTION MAC'
+
+#########################################################################
+### Subroutines #########################################################
+#########################################################################
+
+def parseConfig(file):
+    try:
+        config = json.load(open(file, 'r'))
+    except IOError as e:
+        print("file error:  %s" % e)
+        sys.exit(2)
+    except Exception as e:
+        print("unknown error:  %s" % e)
+        sys.exit(2)
+
+    return config
+
+def get_cert(config):
+    if config['cert_valid']:
+        cert=None
+    else:
+        try:
+            cert = ssl.get_server_certificate((unifi_server, unifi_port))
+        except Exception as e:
+            raise Exception("could not get ssl cert: %s" % e)
+            sys.exit(-1)
+
+    return cert
+
+def connect_unifi(config):
+    cert = get_cert(config)
+    try:
+        client = unificontrol.UnifiClient(
+            host=config['server'],
+            username=config['user'],
+            password=config['pass'],
+            site=config['site'],
+            cert=cert)
+    except Exception as e:
+        raise Exception("could not connect to unifi: %s" % e)
+        sys.exit(-1)
+
+    return client
+
+#########################################################################
+### main () #############################################################
+#########################################################################
+
+def main():
+    global p
+
+    p = optparse.OptionParser(usage=usage, description=description)
+    p.add_option('--debug', dest='debug', action='store_true', default=False)
+    p.add_option('--config', dest='config', action='store',
+        default=config_file)
+    p.add_option('--action', dest='action', action='store', default='status',
+        choices=['status', 'block', 'unblock'])
+
+    global opt
+    opt, args = p.parse_args()
+
+    global config
+    config = parseConfig(opt.config)
+    client = connect_unifi(config)
+
+    if opt.action == 'status':
+        mac = args[0]
+
+        results = client.list_clients(client_mac=mac)
+        print(json.dumps(results, indent=4))
+
+    elif opt.action == 'block':
+        mac = args[0]
+
+        try:
+            client.block_client(mac)
+            print("blocked client: %s" % mac)
+        except Exception as e:
+            raise Exception("tried to unblock %s and failed: %s" % (mac, e))
+
+        # results = client.list_clients(client_mac=mac)
+        # print(json.dumps(results, indent=4))
+
+    elif opt.action == 'unblock':
+        mac = args[0]
+
+        try:
+            client.unblock_client(mac)
+            print("unblocked client: %s" % mac)
+        except Exception as e:
+            raise Exception("tried to unblock %s and failed: %s" % (mac, e))
+
+        # results = client.list_clients(client_mac=mac)
+        # print(json.dumps(results, indent=4))
+
+    else:
+        print("unknown action: %s" % opt.action)
+        sys.exit(-1)
+
+    sys.exit(0)
+    # results = client.list_clients()
+    # print(json.dumps(results, indent=4))
+
+if __name__ == '__main__':
+    main()
+
+#########################################################################
+### POD Documentation ###################################################
+#########################################################################
+
+"""
+
+=head1 NAME
+
+=cut
+
+"""
