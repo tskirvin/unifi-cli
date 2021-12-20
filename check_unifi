@@ -1,0 +1,142 @@
+#!/usr/bin/python3
+# warn if some of the access points are offline
+
+#########################################################################
+### Configuration #######################################################
+#########################################################################
+
+config_file = '/etc/unifi/api.json'
+
+num_crit = 2
+num_warn = 1
+
+me = 'check_unifi'
+
+#########################################################################
+### Declarations ########################################################
+#########################################################################
+
+import json, optparse, unificontrol, ssl, sys
+
+description = 'unifi CLI'
+usage = '%prog --action ACTION MAC'
+
+#########################################################################
+### Subroutines #########################################################
+#########################################################################
+
+def parseConfig(file):
+    try:
+        config = json.load(open(file, 'r'))
+    except IOError as e:
+        print("file error:  %s" % e)
+        sys.exit(2)
+    except Exception as e:
+        print("unknown error:  %s" % e)
+        sys.exit(2)
+
+    return config
+
+def get_cert():
+    if config['cert_valid']:
+        cert=None
+    else:
+        try:
+            cert = ssl.get_server_certificate((unifi_server, unifi_port))
+        except Exception as e:
+            raise Exception("could not get ssl cert: %s" % e)
+            sys.exit(-1)
+
+    return cert
+
+def connect_unifi(config):
+    cert = get_cert()
+    try:
+        client = unificontrol.UnifiClient(
+            host=config['server'],
+            username=config['user'],
+            password=config['pass'],
+            site=config['site'],
+            cert=cert)
+    except Exception as e:
+        raise Exception("could not connect to unifi: %s" % e)
+        sys.exit(-1)
+
+    return client
+
+#########################################################################
+### main () #############################################################
+#########################################################################
+
+def main():
+    global p
+
+    p = optparse.OptionParser(usage=usage, description=description)
+    p.add_option('--debug', dest='debug', action='store_true', default=False)
+    p.add_option('--config', dest='config', action='store',
+        default=config_file)
+    p.add_option('--crit', dest='crit', action='store', default=num_crit)
+    p.add_option('--warn', dest='warn', action='store', default=num_warn)
+    # hostname -H
+    # username -u
+    # password -p
+
+    global opt
+    opt, args = p.parse_args()
+
+    global config
+    config = parseConfig(opt.config)
+    try:
+        client = connect_unifi(config)
+    except Exception as e:
+        print ("2 %s could not connect: %s" % (me, e))
+        sys.exit(-1)
+
+    online = {}
+    offline = {}
+    devices = client.list_devices_basic()
+    for i in devices:
+        name = i['name']
+        state = i['state']
+        if state == 1:
+            online[name] = 1
+        else:
+            offline[name] = 1
+
+    my_str = "%s offline=%d;online=%d;total=%d %d/%d devices online" % (
+        me,
+        len(offline),
+        len(online),
+        len(online) + len(offline),
+        len(online),
+        len(online) + len(offline),
+    )
+    offline_aps = '; '.join(offline.keys())
+    online_aps  = '; '.join(online.keys())
+
+    if len(offline) >= int(opt.crit):
+        print("2 %s (%s)" % (my_str, offline_aps))
+        sys.exit(2)
+    elif len(offline) >= int(opt.warn):
+        print("1 %s (%s)" % (my_str, offline_aps))
+        sys.exit(1)
+    else:
+        print("0 %s (%s)" % (my_str, online_aps))
+        sys.exit(0)
+
+    sys.exit(0)
+
+if __name__ == '__main__':
+    main()
+
+#########################################################################
+### POD Documentation ###################################################
+#########################################################################
+
+"""
+
+=head1 NAME
+
+=cut
+
+"""
